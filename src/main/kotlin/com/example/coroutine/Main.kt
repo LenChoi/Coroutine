@@ -1,12 +1,10 @@
 package com.example.coroutine
 
-import kotlinx.coroutines.*
-import kotlinx.coroutines.channels.actor
-import kotlinx.coroutines.sync.Mutex
-import kotlinx.coroutines.sync.withLock
-import java.util.concurrent.atomic.AtomicInteger
-import kotlin.random.Random
-import kotlin.system.measureTimeMillis
+import kotlinx.coroutines.flow.asFlow
+import kotlinx.coroutines.flow.collect
+import kotlinx.coroutines.flow.count
+import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.runBlocking
 
 //fun main() = runBlocking {
 //    println(coroutineContext)
@@ -289,48 +287,215 @@ import kotlin.system.measureTimeMillis
 //    }
 //    println("Counter = $counter")
 //}
+//
+//sealed class CounterMsg
+//object IncCounter : CounterMsg()
+//class GetCounter(val response: CompletableDeferred<Int>) : CounterMsg()
+//
+//fun CoroutineScope.counterActor() = actor<CounterMsg> {
+//    var counter = 0 // 액터 안에 상태를 캡슐화해두고 다른 코루틴이 접근하지 못하게 한다.
+//
+//    for (msg in channel) { // 외부에서 보내는 것은 채널을 통해서만 받을 수 있다.(receive)
+//        when (msg) {
+//            is IncCounter -> counter++ // 증가시키는 신호.
+//            is GetCounter -> msg.response.complete(counter) // 현재 상태를 반환한다.
+//        }
+//    }
+//}
+//
+//suspend fun massiveRun(action: suspend () -> Unit) {
+//    val n = 100 // 시작할 코루틴의 갯수
+//    val k = 1000 // 코루틴 내에서 반복할 횟수
+//    val elapsed = measureTimeMillis {
+//        coroutineScope { // scope for coroutines
+//            repeat(n) {
+//                launch {
+//                    repeat(k) { action() }
+//                }
+//            }
+//        }
+//    }
+//}
+//
+//fun main() {
+//    runBlocking {
+//        val counter = counterActor()
+//        withContext(Dispatchers.Default) {
+//            massiveRun {
+//                counter.send(IncCounter)
+//            }
+//        }
+//
+//        val response = CompletableDeferred<Int>()
+//        counter.send(GetCounter(response))
+//        println("Counter = ${response.await()}")
+//        counter.close()
+//    }
+//}
 
-sealed class CounterMsg
-object IncCounter : CounterMsg()
-class GetCounter(val response: CompletableDeferred<Int>) : CounterMsg()
+//fun flowSomething(): Flow<Int> = flow {
+//    repeat(10) {
+//        emit(Random.nextInt(0, 500))
+//        delay(10L)
+//    }
+//}
+//
+//fun main()  = runBlocking{
+//    flowSomething().collect { value ->
+//        println(value)
+//    }
+//}
 
-fun CoroutineScope.counterActor() = actor<CounterMsg> {
-    var counter = 0 // 액터 안에 상태를 캡슐화해두고 다른 코루틴이 접근하지 못하게 한다.
+//fun flowSomething(): Flow<Int> = flow {
+//    repeat(10) {
+//        emit(Random.nextInt(0, 500))
+//        delay(100L)
+//    }
+//}
+//
+//fun main() = runBlocking<Unit> {
+//    val result = withTimeoutOrNull(500L) { // 500ms지나면 타임아웃
+//        flowSomething().collect { value ->
+//            println(value)
+//        }
+//        true
+//    } ?: false
+//    if (!result) {
+//        println("취소되었습니다.")
+//    }
+//}
 
-    for (msg in channel) { // 외부에서 보내는 것은 채널을 통해서만 받을 수 있다.(receive)
-        when (msg) {
-            is IncCounter -> counter++ // 증가시키는 신호.
-            is GetCounter -> msg.response.complete(counter) // 현재 상태를 반환한다.
+//fun main() = runBlocking {
+//    flowOf(1, 2, 3, 4, 5).collect { value ->
+//        println(value)
+//    }
+//    flow {
+//        emit(1)
+//        emit(2)
+//        emit(3)
+//        emit(4)
+//        emit(5)
+//    }.collect { println(it) }
+//}
+
+//fun main() = runBlocking {
+//    listOf(1, 2, 3, 4, 5).asFlow().collect { value ->
+//        println(value)
+//    }
+//    (6..10).asFlow().collect {
+//        println(it)
+//    }
+//    flowOf(1, 2, 3, 4, 5).collect { println(it) }
+//}
+
+//fun flowSomething(): Flow<Int> = flow {
+//    repeat(10) {
+//        emit(Random.nextInt(0, 500))
+//        delay(10L)
+//    }
+//}
+//
+//fun main() = runBlocking {
+//    flowSomething().map {
+//        "$it $it"
+//    }.collect { value ->
+//        println(value)
+//    }
+//}
+
+//fun main() = runBlocking{
+//    (1..20).asFlow().filter {
+//        (it % 2) == 0 //술어 predicate
+//    }.collect {
+//        println(it)
+//    }
+//}
+
+//fun main() = runBlocking{
+//    (1..20).asFlow().filterNot {
+//        (it % 2) == 0 //술어 predicate
+//    }.collect {
+//        println(it)
+//    }
+//}
+
+//suspend fun someCalc(i: Int): Int {
+//    delay(100L)
+//    return i * 2
+//}
+//
+//fun main() = runBlocking{
+//    (1..20).asFlow().transform {
+//        emit(it)
+//        emit(someCalc(it))
+//    }.collect {
+//        println(it)
+//    }
+//}
+
+//suspend fun someCalc(i: Int): Int {
+//    delay(100L)
+//    return i * 2
+//}
+//
+//fun main() = runBlocking {
+//    (1..20).asFlow().transform {
+//        emit(it)
+//        emit(someCalc(it))
+//    }.take(10)
+//        .collect {
+//            println(it)
+//        }
+//}
+
+//suspend fun someCalc(i: Int): Int {
+//    delay(100L)
+//    return i * 2
+//}
+//
+//fun main() = runBlocking {
+//    (1..20).asFlow().transform {
+//        emit(it)
+//        emit(someCalc(it))
+//    }.drop(1)
+//        .collect {
+//            println(it)
+//        }
+//}
+
+//suspend fun someCalc(i: Int): Int {
+//    delay(100L)
+//    return i * 2
+//}
+//
+//fun main() = runBlocking {
+//    val value = (1..10)
+//        .asFlow() // 1,2,3,4,5,6,7,~ 10
+//        .reduce { a, b -> //a = 1, b = 2 -> a = 3, b = 3 -> a = 6, b = 4
+//            a + b // 3, 6, 10
+//        } //3  최종 55 나옴
+//    println(value)
+//}
+
+//suspend fun someCalc(i: Int): Int {
+//    delay(10L)
+//    return i * 2
+//}
+//
+//fun main() = runBlocking {
+//    val value = (1..10)
+//        .asFlow() // 1,2,3,4,5,6,7,~ 10
+//        .fold(10) { a, b -> // a: 10, b: 1
+//            a + b
+//        } //최종 65 나옴
+//    println(value)
+//}
+
+fun main() = runBlocking {
+    val counter = (1..10)
+        .asFlow() // 1,2,3,4,5,6,7,~ 10
+        .count {
+            (it % 2) == 0
         }
-    }
-}
-
-suspend fun massiveRun(action: suspend () -> Unit) {
-    val n = 100 // 시작할 코루틴의 갯수
-    val k = 1000 // 코루틴 내에서 반복할 횟수
-    val elapsed = measureTimeMillis {
-        coroutineScope { // scope for coroutines
-            repeat(n) {
-                launch {
-                    repeat(k) { action() }
-                }
-            }
-        }
-    }
-}
-
-fun main() {
-    runBlocking {
-        val counter = counterActor()
-        withContext(Dispatchers.Default) {
-            massiveRun {
-                counter.send(IncCounter)
-            }
-        }
-
-        val response = CompletableDeferred<Int>()
-        counter.send(GetCounter(response))
-        println("Counter = ${response.await()}")
-        counter.close()
-    }
+    println(counter)
 }

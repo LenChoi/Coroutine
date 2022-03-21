@@ -708,7 +708,6 @@ fun main() {
 }
 ```
 
-
 - 액터
 
 액터가 독점적으로 자료를 가지며 그 자료를 다른 코루틴과 공유하지 않고 액터를 통해서만 접근 가능하게 만든다.
@@ -757,4 +756,266 @@ fun main() {
         println("Counter = ${response.await()}")
         counter.close()
     }
+```
+
+# Flow
+
+- Flow는 코틀린에서 쓸 수 있는 비동기 스트림
+- 플로우 빌더 함수를 이용해서 코드블록을 구성하고 emit을 호출해 스트림에 데이터를 흘려보냄
+- 플로우는 콜드 스트림이기 때문에 요청 측에서 collect를 호출해야 값을 발생하기 시작.
+
+```aidl
+fun flowSomething(): Flow<Int> = flow {
+    repeat(10) {
+        emit(Random.nextInt(0, 500))
+        delay(10L)
+    }
+}
+
+fun main()  = runBlocking{
+    flowSomething().collect { value ->
+        println(value)
+    }
+}
+```
+
+- withTimeoutOrNull을 이용하여 간단하게 취소 가능
+
+```aidl
+fun flowSomething(): Flow<Int> = flow {
+    repeat(10) {
+        emit(Random.nextInt(0, 500))
+        delay(100L)
+    }
+}
+
+fun main() = runBlocking<Unit> {
+    val result = withTimeoutOrNull(500L) { // 500ms지나면 타임아웃
+        flowSomething().collect { value ->
+            println(value)
+        }
+        true
+    } ?: false
+    if (!result) {
+        println("취소되었습니다.")
+    }
+}
+```
+
+- flowOf 플로우 빌더
+
+flowOf는 여러 값을 인자로 전달해 플로우를 만든다.
+
+```aidl
+fun main() = runBlocking {
+    flowOf(1, 2, 3, 4, 5).collect { value ->
+        println(value)
+    }
+    flow {
+        emit(1)
+        emit(2)
+        emit(3)
+        emit(4)
+        emit(5)
+    }.collect { println(it) }
+}
+```
+
+- asFlow
+
+컬렉션이나 시퀀스를 전달해 플로우를 만들 수 있다.
+
+```aidl
+fun main() = runBlocking {
+    listOf(1, 2, 3, 4, 5).asFlow().collect { value ->
+        println(value)
+    }
+    (6..10).asFlow().collect {
+        println(it)
+    }
+    flowOf(1, 2, 3, 4, 5).collect { println(it) }
+}
+```
+
+- 플로우와 map
+
+map 연산을 통해 데이터를 가공할 수 있다.
+
+```aidl
+fun flowSomething(): Flow<Int> = flow {
+    repeat(10) {
+        emit(Random.nextInt(0, 500))
+        delay(10L)
+    }
+}
+
+fun main() = runBlocking {
+    flowSomething().map {
+        "$it $it"
+    }.collect { value ->
+        println(value)
+    }
+}
+```
+
+- 플로우와 filter
+
+조건에 맞는 데이터만 남김
+```aidl
+fun main() = runBlocking{
+    (1..20).asFlow().filter {
+        (it % 2) == 0 //술어 predicate
+    }.collect {
+        println(it)
+    }
+}
+```
+
+- filterNot
+
+술어를 반대로 적용
+```aidl
+fun main() = runBlocking{
+    (1..20).asFlow().filterNot {
+        (it % 2) == 0 //술어 predicate
+    }.collect {
+        println(it)
+    }
+}
+```
+
+- transform
+
+조금 더 유연하게 스트림을 변형할 수 있다.
+```aidl
+suspend fun someCalc(i: Int): Int {
+    delay(100L)
+    return i * 2
+}
+
+fun main() = runBlocking{
+    (1..20).asFlow().transform {
+        emit(it)
+        emit(someCalc(it))
+    }.collect {
+        println(it)
+    }
+}
+```
+
+- take 연산자
+
+원하는 개수 만큼 가져옴
+```aidl
+suspend fun someCalc(i: Int): Int {
+    delay(100L)
+    return i * 2
+}
+
+fun main() = runBlocking {
+    (1..20).asFlow().transform {
+        emit(it)
+        emit(someCalc(it))
+    }.take(10)
+        .collect {
+            println(it)
+        }
+}
+```
+
+- takeWhile
+
+조건을 만족하는 동안만 값을 가져옴
+
+```aidl
+suspend fun someCalc(i: Int): Int {
+    delay(100L)
+    return i * 2
+}
+
+fun main() = runBlocking {
+    (1..20).asFlow().transform {
+        emit(it)
+        emit(someCalc(it))
+    }.takeWhile {
+        it < 15
+    }.collect {
+        println(it)
+    }
+}
+```
+
+- drop 
+
+처음 몇개의 결과를 버린다.
+```aidl
+suspend fun someCalc(i: Int): Int {
+    delay(100L)
+    return i * 2
+}
+
+fun main() = runBlocking {
+    (1..20).asFlow().transform {
+        emit(it)
+        emit(someCalc(it))
+    }.drop(1)
+        .collect {
+            println(it)
+        }
+}
+```
+
+- dropWhile
+
+조건에 맞는 값을 버린다.
+
+- reduce
+
+map과 reduce로 함께 소개되는 함수형 언어의 오래된 메커니즘이다.
+첫번째 값을 결과에 넣은 후 각 값을 가져와 누진적으로 계산
+```aidl
+suspend fun someCalc(i: Int): Int {
+    delay(100L)
+    return i * 2
+}
+
+fun main() = runBlocking {
+    val value = (1..10)
+        .asFlow() // 1,2,3,4,5,6,7,~ 10
+        .reduce { a, b -> //a = 1, b = 2 -> a = 3, b = 3 -> a = 6, b = 4
+            a + b // 3, 6, 10
+        } //3  최종 55 나옴
+    println(value)
+}
+```
+
+- fold
+
+reduce와 유사하지만 초기값만 차이 있음
+```aidl
+fun main() = runBlocking {
+    val value = (1..10)
+        .asFlow() // 1,2,3,4,5,6,7,~ 10
+        .fold(10) { a, b -> // a: 10, b: 1
+            a + b
+        } //최종 65 나옴
+    println(value)
+}
+```
+
+- count
+
+술어를 만족하는 자료의 개수를 센다.
+
+count는 종단 연산자, terminal operator. 특정 값, 컬랙션, 결과
+filter는 중간 연산자, 결과를 가져 올수 없다.(collect를 통해 이용 가능)
+```aidl
+fun main() = runBlocking {
+    val counter = (1..10)
+        .asFlow() // 1,2,3,4,5,6,7,~ 10
+        .count {
+            (it % 2) == 0
+        }
+    println(counter)
+}
 ```
